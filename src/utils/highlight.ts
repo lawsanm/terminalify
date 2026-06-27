@@ -1,9 +1,49 @@
-import type { Theme } from '../types';
+import type { PromptSettings, Theme } from '../types';
 import { KNOWN_COMMANDS } from '../commands';
 
 export interface Token {
   text: string;
   color: string;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Highlight output text: any occurrence of the configured `username@hostname`
+ * gets the prompt user color, and an immediately-following `:path` gets the
+ * path color (so pasted prompts like `user@ubuntu:~/dir$` look right too).
+ *
+ * Why: pasted SSH banners, copied prompts, and `whoami`-style output all
+ * contain user@host strings — coloring them matches real terminal rendering.
+ */
+export function highlightOutput(line: string, prompt: PromptSettings, theme: Theme): Token[] {
+  if (!line) return [];
+  const user = prompt.username.trim();
+  const host = prompt.hostname.trim();
+  if (!user || !host) return [{ text: line, color: theme.foreground }];
+
+  // user@host, optionally followed by :path (path runs up to whitespace or `$`).
+  const re = new RegExp(`${escapeRegex(user)}@${escapeRegex(host)}(:[^\\s$]*)?`, 'g');
+
+  const tokens: Token[] = [];
+  let lastIndex = 0;
+  for (const match of line.matchAll(re)) {
+    const start = match.index ?? 0;
+    if (start > lastIndex) {
+      tokens.push({ text: line.slice(lastIndex, start), color: theme.foreground });
+    }
+    tokens.push({ text: `${user}@${host}`, color: theme.user });
+    if (match[1]) {
+      tokens.push({ text: match[1], color: theme.path });
+    }
+    lastIndex = start + match[0].length;
+  }
+  if (lastIndex < line.length) {
+    tokens.push({ text: line.slice(lastIndex), color: theme.foreground });
+  }
+  return tokens;
 }
 
 type TokenKind = 'cmd' | 'flag' | 'string' | 'arg' | 'space';

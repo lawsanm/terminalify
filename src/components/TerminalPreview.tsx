@@ -1,9 +1,9 @@
 import { forwardRef, useMemo } from 'react';
-import type { AppState, Theme } from '../types';
+import type { AppState, PromptSettings, Theme } from '../types';
 import { getTheme } from '../themes';
 import { WindowChrome } from './WindowChrome';
 import { PromptLine } from './PromptLine';
-import { highlightCommand } from '../utils/highlight';
+import { highlightCommand, highlightOutput } from '../utils/highlight';
 
 interface Props {
   state: AppState;
@@ -40,7 +40,6 @@ export const TerminalPreview = forwardRef<HTMLDivElement, Props>(function Termin
       className="inline-block"
       style={{
         background: 'transparent',
-        // Outer padding gives the screenshot some breathing room when exported.
         padding: 32,
       }}
     >
@@ -92,7 +91,7 @@ function TerminalBody({
               <CommandText line={line.text} theme={theme} />
             </>
           ) : (
-            <span>{line.text || ' '}</span>
+            <OutputText line={line.text} theme={theme} prompt={state.prompt} />
           )}
         </div>
       ))}
@@ -103,6 +102,28 @@ function TerminalBody({
 function CommandText({ line, theme }: { line: string; theme: Theme }) {
   if (!line) return null;
   const tokens = highlightCommand(line, theme);
+  return (
+    <>
+      {tokens.map((tok, i) => (
+        <span key={i} style={{ color: tok.color }}>
+          {tok.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function OutputText({
+  line,
+  theme,
+  prompt,
+}: {
+  line: string;
+  theme: Theme;
+  prompt: PromptSettings;
+}) {
+  if (!line) return <span>{' '}</span>;
+  const tokens = highlightOutput(line, prompt, theme);
   return (
     <>
       {tokens.map((tok, i) => (
